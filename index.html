@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>拼豆工坊 · 图片转图纸 + 在线编辑</title>
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="logo">🧩</span>
+      <div>
+        <h1>拼豆工坊</h1>
+        <p class="subtitle">上传图片 → 自动生成拼豆图纸 · 统计用量 · 在线编辑 · 图纸库</p>
+      </div>
+    </div>
+    <nav class="tabs">
+      <button class="tab active" data-tab="create">① 制作图纸</button>
+      <button class="tab" data-tab="library">② 图纸库</button>
+      <button class="tab" data-tab="help">使用帮助</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ===================== 制作图纸 ===================== -->
+    <section class="panel" data-view="create">
+      <div class="workspace">
+        <!-- 左侧控制栏 -->
+        <aside class="sidebar">
+          <div class="card">
+            <h3>1. 上传图片</h3>
+            <label class="dropzone" id="dropzone">
+              <input type="file" id="fileInput" accept="image/*" hidden />
+              <span class="dz-icon">📷</span>
+              <span class="dz-text">点击或拖拽图片到此处</span>
+              <span class="dz-hint">支持 PNG / JPG / GIF / WebP</span>
+            </label>
+            <div class="preview-wrap" id="previewWrap" hidden>
+              <img id="srcPreview" alt="原图预览" />
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>2. 图纸参数</h3>
+            <label class="field">
+              <span>横向豆数（宽）<i class="hint-tip">越大越清晰，建议 80–150</i></span>
+              <div class="num-row">
+                <input type="range" id="gridW" min="8" max="200" value="80" />
+                <input type="number" id="gridWNum" class="num-input" min="8" max="400" value="80" />
+              </div>
+            </label>
+            <label class="field checkbox">
+              <input type="checkbox" id="keepRatio" checked />
+              <span>保持原图比例</span>
+            </label>
+            <label class="field" id="gridHField" hidden>
+              <span>纵向豆数（高）</span>
+              <div class="num-row">
+                <input type="range" id="gridH" min="8" max="200" value="80" />
+                <input type="number" id="gridHNum" class="num-input" min="8" max="400" value="80" />
+              </div>
+            </label>
+
+            <label class="field">
+              <span>调色板</span>
+              <select id="paletteSelect"></select>
+            </label>
+
+            <div class="quick-presets">
+              <span class="muted">快速档位：</span>
+              <button type="button" class="btn chip" data-size="48">小 48</button>
+              <button type="button" class="btn chip" data-size="80">中 80</button>
+              <button type="button" class="btn chip" data-size="120">大 120</button>
+              <button type="button" class="btn chip" data-size="160">超清 160</button>
+            </div>
+
+            <label class="field">
+              <span>对比度增强：<b id="contrastVal">10</b></span>
+              <input type="range" id="contrast" min="-60" max="80" value="10" />
+            </label>
+            <label class="field">
+              <span>色彩饱和度：<b id="saturationVal">15</b></span>
+              <input type="range" id="saturation" min="-60" max="100" value="15" />
+            </label>
+            <label class="field checkbox">
+              <input type="checkbox" id="sharpen" />
+              <span>锐化（强化边缘细节）</span>
+            </label>
+
+            <label class="field checkbox">
+              <input type="checkbox" id="removeBg" />
+              <span>去除浅色背景（留空不放豆）</span>
+            </label>
+            <label class="field" id="bgThreshField" hidden>
+              <span>背景阈值：<b id="bgThreshVal">240</b></span>
+              <input type="range" id="bgThresh" min="180" max="255" value="240" />
+            </label>
+
+            <label class="field">
+              <span>抖动 / 平滑</span>
+              <select id="ditherSelect">
+                <option value="none">无（色块清晰）</option>
+                <option value="floyd">扩散抖动（更细腻）</option>
+              </select>
+            </label>
+
+            <button class="btn primary block" id="convertBtn" disabled>🎨 生成拼豆图纸</button>
+          </div>
+
+          <div class="card" id="brushCard" hidden>
+            <h3>3. 编辑工具</h3>
+            <div class="tool-row">
+              <button class="btn tool active" data-tool="paint" title="画笔">🖌️ 画笔</button>
+              <button class="btn tool" data-tool="erase" title="橡皮">🧽 橡皮</button>
+              <button class="btn tool" data-tool="pick" title="取色">💧 取色</button>
+              <button class="btn tool" data-tool="fill" title="油漆桶（填充相连区域）">🪣 填充</button>
+            </div>
+            <div class="current-color">
+              当前颜色：<span class="swatch" id="currentSwatch"></span>
+              <span id="currentColorName">—</span>
+            </div>
+            <div class="palette-grid" id="paletteGrid"></div>
+          </div>
+        </aside>
+
+        <!-- 中间画布 -->
+        <div class="canvas-area">
+          <div class="canvas-toolbar">
+            <div class="left">
+              <button class="btn" id="zoomOut" title="缩小">➖</button>
+              <span id="zoomLabel">100%</span>
+              <button class="btn" id="zoomIn" title="放大">➕</button>
+              <button class="btn" id="zoomFit" title="适应窗口">⤢ 适应</button>
+            </div>
+            <div class="right">
+              <label class="mini-toggle"><input type="checkbox" id="showGrid" checked /> 网格</label>
+              <label class="mini-toggle"><input type="checkbox" id="showLabels" /> 色号</label>
+              <label class="mini-toggle"><input type="checkbox" id="showRuler" checked /> 坐标</label>
+              <button class="btn" id="undoBtn" title="撤销" disabled>↩︎ 撤销</button>
+              <button class="btn" id="redoBtn" title="重做" disabled>↪︎ 重做</button>
+            </div>
+          </div>
+          <div class="canvas-scroll" id="canvasScroll">
+            <canvas id="patternCanvas"></canvas>
+            <div class="empty-hint" id="emptyHint">
+              <p>👈 上传一张图片并点击「生成拼豆图纸」</p>
+              <p class="muted">或前往「图纸库」选择一个现成图纸开始</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧统计 -->
+        <aside class="sidebar right">
+          <div class="card">
+            <h3>用量统计</h3>
+            <div class="stat-summary" id="statSummary">
+              <div><b id="totalBeads">0</b><span>总豆数</span></div>
+              <div><b id="totalColors">0</b><span>颜色数</span></div>
+              <div><b id="gridSizeLabel">—</b><span>尺寸</span></div>
+            </div>
+            <div class="color-list" id="colorList"></div>
+          </div>
+
+          <div class="card">
+            <h3>导出 / 保存</h3>
+            <button class="btn block" id="exportPng">🖼️ 导出图纸 PNG</button>
+            <button class="btn block" id="exportList">📋 导出用量清单 (CSV)</button>
+            <button class="btn block" id="saveProject">💾 保存项目到本地</button>
+            <button class="btn block" id="loadProject">📂 载入已保存项目</button>
+            <button class="btn block danger" id="clearAll">🗑️ 清空画布</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ===================== 图纸库 ===================== -->
+    <section class="panel" data-view="library" hidden>
+      <div class="library-head">
+        <h2>图纸库</h2>
+        <p class="muted">内置多款现成图纸，点击分类筛选，再点「载入并编辑」即可查看用量并自由修改。</p>
+        <div class="lib-filter" id="libraryFilter"></div>
+      </div>
+      <div class="library-grid" id="libraryGrid"></div>
+    </section>
+
+    <!-- ===================== 使用说明 ===================== -->
+    <section class="panel" data-view="help" hidden>
+      <div class="help-content">
+        <h2>使用说明</h2>
+        <p class="lead">拼豆工坊是一款在线拼豆图纸工具，可将图片转换为拼豆图纸、统计颜色用量，并支持在线编辑与现成图纸库。所有处理均在本地浏览器完成，无需联网。</p>
+
+        <h3>一、软件简介</h3>
+        <p>本工具面向拼豆爱好者，主要解决三个需求：<b>① 把任意图片转成可照着拼的图纸；② 算清每种颜色需要多少颗豆；③ 对图纸进行个性化修改。</b>无需安装，双击 <code>index.html</code> 即可在浏览器中使用。</p>
+
+        <h3>二、快速开始</h3>
+        <ol>
+          <li>进入<b>「制作图纸」</b>页，点击或拖拽上传一张图片。</li>
+          <li>选一个<b>快速档位</b>（小 48 / 中 80 / 大 120 / 超清 160），或拖动「横向豆数」自定义精细度。</li>
+          <li>点击<b>「生成拼豆图纸」</b>，中间画布显示图纸，右侧显示各颜色用量。</li>
+          <li>如需修改，用左下角的编辑工具（画笔 / 橡皮 / 取色 / 填充）在画布上点击或拖拽。</li>
+          <li>满意后在右侧<b>「导出 / 保存」</b>导出 PNG 图纸或 CSV 用量清单。</li>
+        </ol>
+
+        <h3>三、功能说明</h3>
+
+        <h4>3.1 图片转图纸</h4>
+        <table class="help-table">
+          <tr><th>参数</th><th>作用</th></tr>
+          <tr><td>横向豆数</td><td>图纸宽度（格子数）。可拖滑块（8–200）或在数字框直接输入（最高 400）。数值越大越清晰，但用豆更多、成品更大。</td></tr>
+          <tr><td>快速档位</td><td>一键设定常用尺寸：小 48 / 中 80 / 大 120 / 超清 160。</td></tr>
+          <tr><td>保持原图比例</td><td>勾选后高度按原图比例自动计算；取消可手动设定高度。</td></tr>
+          <tr><td>调色板</td><td>采用 MARD 真实色卡，可选 <b>MARD 标准 A–M（221 色）</b> / <b>MARD 全色卡（291 色）</b> / <b>新手精选（72 色）</b>。</td></tr>
+          <tr><td>对比度增强 / 色彩饱和度</td><td>适当提高可让复杂图片更鲜明、避免量化后发灰发闷（默认已各加一点）。</td></tr>
+          <tr><td>锐化</td><td>强化边缘细节，照片类图片边缘发虚时可勾选。</td></tr>
+          <tr><td>去除浅色背景</td><td>把接近白色的背景留空不放豆，适合主体清晰、底色干净的图。</td></tr>
+          <tr><td>抖动 / 平滑</td><td>「无」色块清晰；「扩散抖动」用混色让渐变更细腻。</td></tr>
+        </table>
+        <p class="muted">提示：大图会先做分步降采样再匹配颜色，相比一次性缩放能保留更多细节，减少“糊成一团”。</p>
+
+        <h4>3.2 用量统计</h4>
+        <p>生成或编辑后，右侧实时显示<b>总豆数、颜色数、图纸尺寸</b>，并按用量从多到少列出每种颜色的<b>色号</b>与数量（占比条直观对比）。点击任意颜色一行，即可将其设为当前画笔颜色。</p>
+
+        <h4>3.3 在线编辑</h4>
+        <p>生成图纸后，左下角出现编辑工具。先在调色板中选择颜色，再选择工具在画布上操作：</p>
+        <table class="help-table">
+          <tr><th>工具</th><th>说明</th></tr>
+          <tr><td>🖌️ 画笔</td><td>点击或按住拖拽，给格子涂上当前颜色。</td></tr>
+          <tr><td>🧽 橡皮</td><td>清除格子（变为空格，不放豆）。</td></tr>
+          <tr><td>💧 取色</td><td>点击某格，把它的颜色设为当前画笔颜色。</td></tr>
+          <tr><td>🪣 填充</td><td>把相连的同色区域一次性替换为当前颜色。</td></tr>
+        </table>
+        <p>画布上方可切换<b>网格线 / 色号 / 坐标尺</b>，并进行缩放与「适应窗口」。勾选「色号」会在每格显示对应 MARD 色号（格子太小时会自动放大以便看清）。</p>
+
+        <h4>3.4 图纸库</h4>
+        <p>「图纸库」页内置 <b>32 款现成图纸</b>，分为<b>经典 / 表情 / 动物 / 食物 / 植物 / 节日 / 游戏</b>七类，点击顶部分类标签可筛选。点「载入并编辑」即可作为模板查看用量或二次创作；载入时颜色会自动吸附到最接近的 MARD 色号。</p>
+
+        <h4>3.5 导出与保存</h4>
+        <table class="help-table">
+          <tr><th>操作</th><th>说明</th></tr>
+          <tr><td>导出图纸 PNG</td><td>导出带网格线的高清图纸图片，便于打印对照。<b>若已勾选「色号」，图片每格会标注 MARD 色号。</b></td></tr>
+          <tr><td>导出用量 CSV</td><td>导出每种颜色的<b>色号、色值、数量</b>，可用 Excel 打开备料。</td></tr>
+          <tr><td>保存 / 载入项目</td><td>把当前图纸保存为 JSON（并存入浏览器本地），日后可载入继续编辑。</td></tr>
+          <tr><td>清空画布</td><td>清除全部格子，可用撤销恢复。</td></tr>
+        </table>
+
+        <h3>四、快捷键</h3>
+        <p><kbd>Ctrl</kbd> + <kbd>Z</kbd> 撤销，<kbd>Ctrl</kbd> + <kbd>Y</kbd>（或 <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd>）重做。</p>
+
+        <h3>五、常见问题</h3>
+        <p><b>Q：生成的图纸颜色偏差较大 / 糊成一团？</b><br/>A：提高「横向豆数」（如 120–160）、开启「扩散抖动」，并适当增加对比度/饱和度；边缘发虚可再勾选「锐化」。建议使用对比度高、主体清晰的图片（卡通、像素图、Logo 效果最佳）。</p>
+        <p><b>Q：图纸太大不好拼？</b><br/>A：降低「横向豆数」或选用「新手精选（72 色）」调色板减少颜色种类。</p>
+        <p><b>Q：勾选色号后看不清 / 想打印带色号的图纸？</b><br/>A：勾选「色号」会自动放大画布显示；导出 PNG 时若保持勾选，图片每格也会带色号。</p>
+        <p><b>Q：保存的项目在哪里？</b><br/>A：点击保存会下载一个 <code>.json</code> 文件，同时存入当前浏览器本地；下次用「载入已保存项目」选择该文件即可恢复。</p>
+
+        <hr class="help-divider" />
+        <div class="help-note">🎨 内置色号采用 <b>MARD 拼豆色卡</b>，色号仅为<b>字母 + 数字</b>（如 A01、F03、ZG3），按色系字母分组：<b>A–H、M 系为标准 221 色套装</b>（A 黄橙系、B 绿系、C 蓝青系、D 蓝紫系、E 粉红系、F 红系、G 灰白黑系、H 紫系、M 灰系等），<b>P/Q/R/T/Y/ZG 为扩展特殊色</b>（合计 291 色）。色值为近似 HEX，颜色匹配采用 CIE-Lab 距离贴近人眼感受；实际购买请以厂商实物色卡为准。</div>
+      </div>
+    </section>
+  </main>
+
+  <input type="file" id="projectFileInput" accept="application/json" hidden />
+  <div class="toast" id="toast" hidden></div>
+
+  <!-- 单文件经典脚本：可直接双击 index.html (file://) 运行，无需服务器 -->
+  <script src="./src/app.js"></script>
+</body>
+</html>
